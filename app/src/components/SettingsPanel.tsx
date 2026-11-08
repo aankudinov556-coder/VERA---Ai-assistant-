@@ -1,3 +1,4 @@
+import { Modal } from "./Modal";
 import type { FxMode, Settings } from "../store/settings";
 
 interface Props {
@@ -13,8 +14,7 @@ export function SettingsPanel({ section = "all", settings, keyError, models, onC
   const all = section === "all";
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v });
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="glass panel" onClick={(e) => e.stopPropagation()}>
+    <Modal className="" onClose={onClose}>
         <h2>{all ? "Настройки" : "Голос"}</h2>
 
         {all && (<>
@@ -101,7 +101,6 @@ export function SettingsPanel({ section = "all", settings, keyError, models, onC
         <button className="btn" onClick={onClose}>
           Готово
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }

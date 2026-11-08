@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Conversation } from "../store/db";
 
 interface Props {
@@ -18,6 +18,11 @@ export function Sidebar(p: Props) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (p.open) setTimeout(() => searchRef.current?.focus(), 150);
+  }, [p.open]);
 
   useEffect(() => {
     const t = setTimeout(() => p.onSearch(query), 200);
@@ -35,9 +40,10 @@ export function Sidebar(p: Props) {
       {p.open && <div className="sidebar-backdrop" onClick={p.onClose} />}
       <aside className={`glass sidebar ${p.open ? "sidebar--open" : ""}`}>
         <button className="btn" onClick={p.onNew} disabled={p.disabled}>
-          + Новый чат
+          + Новый чат <span className="kbd">Ctrl+N</span>
         </button>
         <input
+          ref={searchRef}
           className="search"
           value={query}
           placeholder="Поиск по чатам…"

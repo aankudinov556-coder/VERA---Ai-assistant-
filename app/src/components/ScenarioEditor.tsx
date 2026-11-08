@@ -1,3 +1,4 @@
+import { Modal } from "./Modal";
 import { useEffect, useState } from "react";
 import { BLOCKS, blockDef, newStep, type FieldDef } from "../scenarios/blocks";
 import type { Scenario, Step, StepType } from "../scenarios/types";
@@ -69,6 +70,18 @@ export function ScenarioEditor({ scenarios, onSave, onDelete, onRun, onClose }: 
     setStatus("Сохранено");
   };
 
+  // Ctrl+S — сохранить
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (dirty) save();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const addPhrase = () => {
     const p = phraseInput.trim();
     if (!draft || !p || draft.phrases.includes(p)) return;
@@ -88,8 +101,7 @@ export function ScenarioEditor({ scenarios, onSave, onDelete, onRun, onClose }: 
   };
 
   return (
-    <div className="overlay" onClick={() => confirmLeave() && onClose()}>
-      <div className="glass panel editor" onClick={(e) => e.stopPropagation()}>
+    <Modal className="editor" onClose={() => confirmLeave() && onClose()}>
         <div className="editor__head">
           <h2>Блоки команд</h2>
           <button className="btn ghost" onClick={() => confirmLeave() && onClose()}>
@@ -180,7 +192,7 @@ export function ScenarioEditor({ scenarios, onSave, onDelete, onRun, onClose }: 
                 >
                   Удалить
                 </button>
-                <button className="btn" onClick={save} disabled={!dirty}>
+                <button className="btn" onClick={save} disabled={!dirty} title="Ctrl+S">
                   Сохранить
                 </button>
               </div>
@@ -190,8 +202,7 @@ export function ScenarioEditor({ scenarios, onSave, onDelete, onRun, onClose }: 
             <section className="editor__main empty">Создайте первый сценарий</section>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

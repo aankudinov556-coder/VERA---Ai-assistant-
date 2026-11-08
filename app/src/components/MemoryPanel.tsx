@@ -1,3 +1,4 @@
+import { Modal } from "./Modal";
 import { useState } from "react";
 import type { Memory } from "../store/db";
 
@@ -19,8 +20,7 @@ export function MemoryPanel({ memories, enabled, onToggle, onAdd, onDelete, onCl
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="glass panel" onClick={(e) => e.stopPropagation()}>
+    <Modal className="" onClose={onClose}>
         <h2>Память</h2>
         <p className="muted small">
           VERA сама запоминает важные факты о вас из разговоров. Здесь их можно посмотреть, добавить или удалить.
@@ -58,7 +58,6 @@ export function MemoryPanel({ memories, enabled, onToggle, onAdd, onDelete, onCl
         <button className="btn ghost" onClick={onClose}>
           Закрыть
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }

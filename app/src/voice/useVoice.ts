@@ -22,6 +22,8 @@ export function useVoice(settings: Settings, onText: (text: string) => Promise<v
       onMode: setMode,
       onPartial: setPartial,
       onError: setError,
+      // Пишем прямо в CSS-переменную, без перерисовки React.
+      onLevel: (level) => document.documentElement.style.setProperty("--mic-level", level.toFixed(2)),
       onUtterance: async (text, audio, rate) => {
         const s = settingsRef.current;
         const engine = engineRef.current!;

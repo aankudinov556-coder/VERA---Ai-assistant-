@@ -8,6 +8,8 @@ export interface VoiceEvents {
   /** Конец фразы: распознанный Vosk текст и записанный звук (для облачного распознавания). */
   onUtterance: (text: string, audio: Float32Array, sampleRate: number) => void;
   onError: (message: string) => void;
+  /** Громкость входа 0..1 во время записи (для анимации кнопки). */
+  onLevel?: (level: number) => void;
 }
 
 const MODEL_URL = "/models/vosk-ru.tar.gz";
@@ -43,6 +45,7 @@ export class VoiceEngine {
   }
 
   private setMode(m: VoiceMode) {
+    if (m !== "listening") this.ev.onLevel?.(0);
     this.mode = m;
     this.ev.onMode(m);
   }
@@ -92,6 +95,9 @@ export class VoiceEngine {
     if (this.mode === "wake" && this.wakeRec) {
       this.wakeRec.acceptWaveformFloat(data, rate);
     } else if (this.mode === "listening" && this.cmdRec) {
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) sum += data[i] * data[i];
+      this.ev.onLevel?.(Math.min(1, Math.sqrt(sum / (data.length / 4)) * 6));
       this.chunks.push(new Float32Array(data));
       this.cmdRec.acceptWaveformFloat(data, rate);
     }
