@@ -16,7 +16,7 @@ i5-3330S (без AVX2), GTX 760 2 ГБ, 8 ГБ DDR3 → API по умолчан�
 
 ## Этапы
 1. [x] Каркас, дизайн-система crystal, чат с OpenRouter
-2. [ ] Tauri-оболочка, CI-сборка установщика для Windows, ключ в системном хранилище
+2. [x] Tauri-оболочка, CI-сборка установщика для Windows (GitHub Actions), ключ в Windows Credential Manager
 3. [ ] Память и история (SQLite)
 4. [ ] Локальные модели (Ollama)
 5. [ ] Голос: запись → STT → TTS → слово активации
