@@ -8,6 +8,7 @@ export interface Settings {
   model: string;
   systemPrompt: string;
   fx: FxMode;
+  memoryEnabled: boolean;
 }
 
 const KEY = "vera.settings.v1";
@@ -19,6 +20,7 @@ const DEFAULTS: Settings = {
   systemPrompt:
     "Ты — VERA, дружелюбный и внимательный ИИ-компаньон. Отвечай по-русски, коротко и по делу, если не попросили иначе.",
   fx: "lite",
+  memoryEnabled: true,
 };
 
 function load(): Settings {
@@ -36,23 +38,25 @@ function load(): Settings {
  */
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(load);
-  const keyLoaded = useRef(!isTauri);
+  const [keyError, setKeyError] = useState("");
+  // Значение, которое сейчас лежит в системном хранилище; null — ещё не загружено.
+  const savedKey = useRef<string | null>(isTauri ? null : "");
 
-  // Один раз: достать ключ из системного хранилища (+ перенос из localStorage, если был).
   useEffect(() => {
     if (!isTauri) return;
     (async () => {
       try {
-        const stored = await invoke<string>("get_api_key");
-        if (stored) {
-          setSettings((s) => ({ ...s, apiKey: stored }));
-        } else if (load().apiKey) {
-          await invoke("set_api_key", { key: load().apiKey });
+        let stored = await invoke<string>("get_api_key");
+        const legacy = load().apiKey;
+        if (!stored && legacy) {
+          await invoke("set_api_key", { key: legacy });
+          stored = legacy;
         }
-      } catch {
-        /* хранилище недоступно — работаем с тем, что есть */
-      } finally {
-        keyLoaded.current = true;
+        savedKey.current = stored;
+        if (stored) setSettings((s) => ({ ...s, apiKey: stored }));
+      } catch (e) {
+        savedKey.current = "";
+        setKeyError(`Не удалось прочитать ключ: ${e}`);
       }
     })();
   }, []);
@@ -67,18 +71,14 @@ export function useSettings() {
     document.documentElement.dataset.fx = settings.fx;
   }, [settings]);
 
-  // Запись ключа в системное хранилище при изменении (после первоначальной загрузки).
-  const lastKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!isTauri || !keyLoaded.current) return;
-    if (lastKey.current === null) {
-      lastKey.current = settings.apiKey;
-      return;
-    }
-    if (lastKey.current === settings.apiKey) return;
-    lastKey.current = settings.apiKey;
-    invoke("set_api_key", { key: settings.apiKey }).catch(() => {});
+    if (!isTauri || savedKey.current === null) return;
+    if (settings.apiKey === savedKey.current) return;
+    savedKey.current = settings.apiKey;
+    invoke("set_api_key", { key: settings.apiKey })
+      .then(() => setKeyError(""))
+      .catch((e) => setKeyError(`Не удалось сохранить ключ: ${e}`));
   }, [settings.apiKey]);
 
-  return [settings, setSettings] as const;
+  return [settings, setSettings, keyError] as const;
 }

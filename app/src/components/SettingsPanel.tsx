@@ -2,12 +2,13 @@ import type { FxMode, Settings } from "../store/settings";
 
 interface Props {
   settings: Settings;
+  keyError: string;
   models: { id: string; name: string }[];
   onChange: (s: Settings) => void;
   onClose: () => void;
 }
 
-export function SettingsPanel({ settings, models, onChange, onClose }: Props) {
+export function SettingsPanel({ settings, keyError, models, onChange, onClose }: Props) {
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v });
   return (
     <div className="overlay" onClick={onClose}>
@@ -20,8 +21,9 @@ export function SettingsPanel({ settings, models, onChange, onClose }: Props) {
             type="password"
             value={settings.apiKey}
             placeholder="sk-or-..."
-            onChange={(e) => set("apiKey", e.target.value)}
+            onChange={(e) => set("apiKey", e.target.value.trim())}
           />
+          {keyError && <span className="error-text">{keyError}</span>}
         </label>
 
         <label>
