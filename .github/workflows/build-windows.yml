@@ -27,9 +27,24 @@ jobs:
         with:
           workspaces: app/src-tauri
 
+      # Упаковщик установщика NSIS Tauri скачивает с GitHub; кешируем, чтобы не зависеть от сбоев сети
+      - uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: tauri-tools-${{ runner.os }}-v1
+
       - run: npm ci
 
-      - run: npm run tauri build
+      - name: Build (до 3 попыток при сетевых сбоях)
+        shell: pwsh
+        run: |
+          for ($i = 1; $i -le 3; $i++) {
+            npm run tauri build
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "Попытка $i не удалась, повтор через 20 с..."
+            Start-Sleep -Seconds 20
+          }
+          exit 1
 
       - uses: actions/upload-artifact@v4
         with:
