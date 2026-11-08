@@ -1,6 +1,7 @@
 import type { FxMode, Settings } from "../store/settings";
 
 interface Props {
+  section?: "all" | "voice";
   settings: Settings;
   keyError: string;
   models: { id: string; name: string }[];
@@ -8,13 +9,15 @@ interface Props {
   onClose: () => void;
 }
 
-export function SettingsPanel({ settings, keyError, models, onChange, onClose }: Props) {
+export function SettingsPanel({ section = "all", settings, keyError, models, onChange, onClose }: Props) {
+  const all = section === "all";
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v });
   return (
     <div className="overlay" onClick={onClose}>
       <div className="glass panel" onClick={(e) => e.stopPropagation()}>
-        <h2>Настройки</h2>
+        <h2>{all ? "Настройки" : "Голос"}</h2>
 
+        {all && (<>
         <label>
           API-ключ OpenRouter
           <input
@@ -50,8 +53,9 @@ export function SettingsPanel({ settings, keyError, models, onChange, onClose }:
             onChange={(e) => set("systemPrompt", e.target.value)}
           />
         </label>
+        </>)}
 
-        <h3>Голос</h3>
+        {all && <h3>Голос</h3>}
         <label className="row">
           <input
             type="checkbox"
@@ -82,6 +86,7 @@ export function SettingsPanel({ settings, keyError, models, onChange, onClose }:
           </label>
         )}
 
+        {all && (<>
         <h3>Интерфейс</h3>
         <label>
           Эффекты (для слабых ПК выберите «Упрощённые»)
@@ -91,6 +96,7 @@ export function SettingsPanel({ settings, keyError, models, onChange, onClose }:
             <option value="off">Выключены</option>
           </select>
         </label>
+        </>)}
 
         <button className="btn" onClick={onClose}>
           Готово

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MemoryPanel } from "./components/MemoryPanel";
 import { ScenarioEditor } from "./components/ScenarioEditor";
+import { Decor } from "./components/Decor";
+import { Icon, Sparkle } from "./components/Icons";
 import { Orb, type OrbState } from "./components/Orb";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Sidebar } from "./components/Sidebar";
@@ -62,6 +64,19 @@ export default function App() {
   const [showMemory, setShowMemory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [settingsSection, setSettingsSection] = useState<"all" | "voice">("all");
+  const [online, setOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -286,9 +301,109 @@ export default function App() {
     }
   }
 
+  const hasChat = messages.length > 0 || Boolean(error);
+  const nav: { id: string; label: string; icon: string; active: boolean; onClick: () => void }[] = [
+    { id: "home", label: "Главная", icon: "home", active: !anyOverlay(), onClick: () => { closeOverlays(); newChat(); } },
+    { id: "chats", label: "Чаты", icon: "chats", active: sidebarOpen, onClick: () => { closeOverlays(); setSidebarOpen(true); } },
+    { id: "modules", label: "Команды", icon: "modules", active: showScenarios, onClick: () => { closeOverlays(); setShowScenarios(true); } },
+    { id: "voice", label: "Голос", icon: "mic", active: settingsSection === "voice" && showSettings, onClick: () => { closeOverlays(); setSettingsSection("voice"); setShowSettings(true); } },
+    { id: "memories", label: "Память", icon: "memories", active: showMemory, onClick: () => { closeOverlays(); setShowMemory(true); } },
+    { id: "settings", label: "Настройки", icon: "settings", active: settingsSection === "all" && showSettings, onClick: () => { closeOverlays(); setSettingsSection("all"); setShowSettings(true); } },
+  ];
+
+  function anyOverlay() {
+    return sidebarOpen || showScenarios || showSettings || showMemory;
+  }
+  function closeOverlays() {
+    setSidebarOpen(false);
+    setShowScenarios(false);
+    setShowSettings(false);
+    setShowMemory(false);
+  }
+
+  const composer = (
+    <div className={`composer ${hasChat ? "composer--docked" : ""}`}>
+      <button className="composer__btn" title="Новый чат" onClick={newChat} disabled={busy}>
+        <Icon name="plus" size={24} />
+      </button>
+      <textarea
+        rows={1}
+        value={input}
+        placeholder={voice.mode === "listening" ? voice.partial || "Слушаю…" : "Спросите что угодно…"}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            send();
+          }
+        }}
+      />
+      <button
+        className={`composer__btn mic mic--${voice.mode}`}
+        title={
+          voice.mode === "listening"
+            ? "Закончить фразу"
+            : voice.mode === "wake"
+              ? `Жду слово «${settings.wakeWord}» — или нажмите, чтобы говорить`
+              : "Сказать голосом"
+        }
+        onClick={voice.toggle}
+        disabled={voice.mode === "loading" || voice.mode === "processing"}
+      >
+        <Icon name="mic" size={22} />
+      </button>
+      {busy ? (
+        <button className="send" title="Остановить" onClick={() => abortRef.current?.abort()}>
+          <Icon name="stop" size={22} />
+        </button>
+      ) : (
+        <button className="send" title="Отправить" onClick={send} disabled={!input.trim()}>
+          <Icon name="send" size={24} />
+        </button>
+      )}
+    </div>
+  );
+
+  const voiceLine =
+    voice.error ||
+    (voice.mode === "processing"
+      ? "Распознаю…"
+      : voice.mode === "listening"
+        ? voice.partial || "Слушаю… говорите"
+        : "");
+
   return (
-    <div className="app">
+    <div className={`app ${hasChat ? "app--chat" : "app--home"}`}>
       <div className="bg" aria-hidden />
+      <Decor />
+
+      <nav className="topnav">
+        {nav.map((n, i) => (
+          <span key={n.id} className="topnav__cell">
+            {i > 0 && <span className="topnav__sep" />}
+            <button className={`topnav__item ${n.active ? "topnav__item--active" : ""}`} onClick={n.onClick}>
+              <Icon name={n.icon} />
+              <span className="topnav__label">{n.label}</span>
+            </button>
+          </span>
+        ))}
+      </nav>
+
+      <div className="corner">
+        <Orb state={orbState} />
+      </div>
+
+      <aside className="rail">
+        <button className="rail__btn rail__btn--active" title="Новый чат" onClick={() => { closeOverlays(); newChat(); }}>
+          <Sparkle size={26} />
+        </button>
+        <button className="rail__btn" title="Чаты" onClick={() => { closeOverlays(); setSidebarOpen(true); }}>
+          <Icon name="list" />
+        </button>
+        <button className="rail__btn" title="Редактор команд" onClick={() => { closeOverlays(); setShowScenarios(true); }}>
+          <Icon name="edit" />
+        </button>
+      </aside>
 
       <Sidebar
         open={sidebarOpen}
@@ -311,90 +426,90 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      <section className="main">
-        <header className="glass topbar">
-          <button className="btn ghost icon menu-btn" title="Чаты" onClick={() => setSidebarOpen(true)}>
-            ☰
-          </button>
-          <Orb state={orbState} />
-          <div className="title">
-            <strong>VERA</strong>
-            <span>{settings.model}</span>
+      {hasChat ? (
+        <section className="chatview">
+          <main className="chat">
+            {messages.map((m, i) => (
+              <div key={i} className={`bubble ${m.role} ${m.kind ?? ""}`}>
+                {m.content || <span className="dots">…</span>}
+              </div>
+            ))}
+            {error && <div className="bubble error">{error}</div>}
+            <div ref={endRef} />
+          </main>
+          {voiceLine && <div className={`voice-status ${voice.error ? "voice-status--error" : ""}`}>{voiceLine}</div>}
+          {composer}
+        </section>
+      ) : (
+        <section className="hero">
+          <div className="hero__star">
+            <Sparkle size={120} />
           </div>
-          <button className="btn ghost" onClick={() => setShowScenarios(true)}>
-            Команды
-          </button>
-          <button className="btn ghost" onClick={() => setShowMemory(true)}>
-            Память{memories.length ? ` · ${memories.length}` : ""}
-          </button>
-          <button className="btn ghost" onClick={() => setShowSettings(true)}>
-            Настройки
-          </button>
-        </header>
-
-        <main className="chat">
-          {messages.length === 0 && <div className="empty">Привет! Я VERA. О чём поговорим?</div>}
-          {messages.map((m, i) => (
-            <div key={i} className={`bubble glass ${m.role} ${m.kind ?? ""}`}>
-              {m.content || <span className="dots">…</span>}
-            </div>
-          ))}
-          {error && <div className="bubble glass error">{error}</div>}
-          <div ref={endRef} />
-        </main>
-
-        {(voice.mode === "listening" || voice.mode === "processing" || voice.error) && (
-          <div className={`glass voice-status ${voice.error ? "voice-status--error" : ""}`}>
-            {voice.error ||
-              (voice.mode === "processing"
-                ? "Распознаю…"
-                : voice.partial || "Слушаю… говорите")}
-          </div>
-        )}
-
-        <footer className="glass composer">
-          <button
-            className={`btn icon mic mic--${voice.mode}`}
-            title={
-              voice.mode === "listening"
-                ? "Закончить фразу"
-                : voice.mode === "wake"
-                  ? `Жду слово «${settings.wakeWord}» — или нажмите, чтобы говорить`
-                  : "Сказать голосом"
-            }
-            onClick={voice.toggle}
-            disabled={voice.mode === "loading" || voice.mode === "processing"}
-          >
-            {voice.mode === "loading" ? "…" : "🎙"}
-          </button>
-          <textarea
-            rows={1}
-            value={input}
-            placeholder="Напишите сообщение…"
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-          />
-          {busy ? (
-            <button className="btn" onClick={() => abortRef.current?.abort()}>
-              Стоп
-            </button>
+          <h1 className="wordmark">
+            vera
+            <Sparkle size={44} className="wordmark__spark" />
+          </h1>
+          <p className="hero__greet">Привет, друг!</p>
+          {composer}
+          {voiceLine ? (
+            <div className={`voice-status ${voice.error ? "voice-status--error" : ""}`}>{voiceLine}</div>
           ) : (
-            <button className="btn" onClick={send} disabled={!input.trim()}>
-              Отправить
-            </button>
+            <div className="quick">
+              <button
+                onClick={() => conversations[0] && openConversation(conversations[0].id)}
+                disabled={!conversations.length}
+              >
+                <Icon name="arrow" size={18} /> Продолжить чат
+              </button>
+              <span className="quick__sep" />
+              <button onClick={() => setSettings({ ...settings, wakeEnabled: !settings.wakeEnabled })}>
+                {settings.wakeEnabled ? "Выключить голос" : "Включить голос"}
+              </button>
+              <span className="quick__sep" />
+              <button onClick={() => handleInput("Как дела?")}>Как дела?</button>
+            </div>
           )}
-        </footer>
-      </section>
+          <div className="always">
+            <Sparkle size={20} /> VERA всегда рядом <span className="always__dash" />
+          </div>
+        </section>
+      )}
+
+      <div className="chips-bar">
+        <button
+          className="pill pill--active"
+          title="Модель (изменить в настройках)"
+          onClick={() => { closeOverlays(); setSettingsSection("all"); setShowSettings(true); }}
+        >
+          <Sparkle size={16} /> {settings.model.split("/").pop()}
+        </button>
+        <button
+          className={`pill ${settings.sttEngine === "local" ? "pill--on" : ""}`}
+          title="Распознавание речи офлайн (Vosk)"
+          onClick={() => setSettings({ ...settings, sttEngine: "local" })}
+        >
+          <Icon name="mic" size={16} /> Офлайн
+        </button>
+        <button
+          className={`pill ${settings.sttEngine === "cloud" ? "pill--on" : ""}`}
+          title="Распознавание речи в облаке (OpenRouter)"
+          onClick={() => setSettings({ ...settings, sttEngine: "cloud" })}
+        >
+          <Icon name="bolt" size={16} /> Облако
+        </button>
+      </div>
+
+      <div className="status">
+        <span className={`status__dot ${online ? "" : "status__dot--off"}`} />
+        {online ? "В сети" : "Нет сети"}
+        {voice.mode === "wake" && <span className="status__voice">· жду «{settings.wakeWord}»</span>}
+      </div>
 
       {toast && <div className="glass toast">{toast}</div>}
 
       {showSettings && (
         <SettingsPanel
+          section={settingsSection}
           settings={settings}
           keyError={keyError}
           models={models}
