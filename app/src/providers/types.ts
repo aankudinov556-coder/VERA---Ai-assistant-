@@ -8,6 +8,13 @@ export interface ChatMessage {
 export interface ModelInfo {
   id: string;
   name: string;
+  /** Размер контекста в токенах. */
+  context?: number;
+  /** Цена в $ за 1 млн токенов (вход / выход). */
+  priceIn?: number;
+  priceOut?: number;
+  /** Принимает аудио на вход (подходит для облачного распознавания речи). */
+  audio?: boolean;
 }
 
 export interface StreamOptions {

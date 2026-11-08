@@ -103,6 +103,18 @@ async fn run_shell(command: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Записать текстовый файл (путь выбирает пользователь в системном диалоге).
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| e.to_string())
+}
+
+/// Прочитать текстовый файл (путь выбирает пользователь в системном диалоге).
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
 /// Схема базы истории и памяти. Новые изменения — только новыми миграциями (version + 1).
 fn migrations() -> Vec<Migration> {
     vec![Migration {
@@ -156,12 +168,15 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_api_key,
             set_api_key,
             open_target,
             run_program,
-            run_shell
+            run_shell,
+            write_text_file,
+            read_text_file
         ])
         .run(tauri::generate_context!())
         .expect("ошибка запуска VERA");

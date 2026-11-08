@@ -6,12 +6,13 @@ import { ScenarioEditor } from "./components/ScenarioEditor";
 import { Decor } from "./components/Decor";
 import { Icon, Sparkle } from "./components/Icons";
 import { Orb, type OrbState } from "./components/Orb";
-import { SettingsPanel } from "./components/SettingsPanel";
+import { SettingsPanel, type SettingsTab } from "./components/SettingsPanel";
+import { openTextFile, saveTextFile } from "./files";
 import { Sidebar } from "./components/Sidebar";
 import { buildSystemPrompt, extractMemories, stripMemoryTags } from "./memory";
 import { createOpenRouter } from "./providers/openrouter";
 import type { ChatMessage, ModelInfo } from "./providers/types";
-import { getStore, type Conversation, type Memory } from "./store/db";
+import { getStore, type Backup, type Conversation, type Memory } from "./store/db";
 import { useSettings } from "./store/settings";
 import { defaultScenarios } from "./scenarios/defaults";
 import { httpRequest, openTarget, runProgram, runShell } from "./scenarios/host";
@@ -68,7 +69,7 @@ export default function App() {
   const [showMemory, setShowMemory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
-  const [settingsSection, setSettingsSection] = useState<"all" | "voice">("all");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("model");
   const [online, setOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -360,10 +361,47 @@ export default function App() {
     setShowSettings(false);
     setShowMemory(false);
   }
-  const openSettings = (section: "all" | "voice") => {
+  const openSettings = (tab?: SettingsTab) => {
     closeOverlays();
-    setSettingsSection(section);
+    if (tab) setSettingsTab(tab);
     setShowSettings(true);
+  };
+
+  /** Действия раздела «Данные». */
+  const dataActions = {
+    exportAll: async () => {
+      const backup = await (await getStore()).exportAll();
+      const date = new Date().toISOString().slice(0, 10);
+      const ok = await saveTextFile(`vera-backup-${date}.json`, JSON.stringify(backup, null, 2));
+      return ok
+        ? `Сохранено: ${backup.conversations.length} чатов, ${backup.memories.length} фактов, ${backup.scenarios.length} сценариев`
+        : "Отменено";
+    },
+    importAll: async () => {
+      const text = await openTextFile();
+      if (!text) return "Отменено";
+      let b: Backup;
+      try {
+        b = JSON.parse(text);
+      } catch {
+        throw new Error("Файл повреждён или это не JSON");
+      }
+      if (b?.app !== "vera") throw new Error("Это не резервная копия VERA");
+      await (await getStore()).importAll(b);
+      await Promise.all([refreshConversations(""), refreshMemories(), refreshScenarios()]);
+      return `Загружено: ${b.conversations?.length ?? 0} чатов, ${b.memories?.length ?? 0} фактов, ${b.scenarios?.length ?? 0} сценариев`;
+    },
+    clearHistory: async () => {
+      await (await getStore()).clearHistory();
+      newChat();
+      await refreshConversations("");
+      return "Все чаты удалены";
+    },
+    clearMemories: async () => {
+      await (await getStore()).clearMemories();
+      await refreshMemories();
+      return "Память очищена";
+    },
   };
 
   // Горячие клавиши
@@ -391,7 +429,7 @@ export default function App() {
       voice.toggle();
     } else if (ctrl && (e.key === "," || key === "б")) {
       e.preventDefault();
-      openSettings("all");
+      openSettings();
     } else if (e.key === "/" && !anyOverlay() && document.activeElement?.tagName !== "TEXTAREA" && document.activeElement?.tagName !== "INPUT") {
       e.preventDefault();
       inputRef.current?.focus();
@@ -412,9 +450,9 @@ export default function App() {
     { id: "home", label: "Главная", icon: "home", hint: "Ctrl+N — новый чат", active: !anyOverlay(), onClick: () => { closeOverlays(); newChat(); } },
     { id: "chats", label: "Чаты", icon: "chats", hint: "Ctrl+K", active: sidebarOpen, onClick: () => { closeOverlays(); setSidebarOpen(true); } },
     { id: "modules", label: "Команды", icon: "modules", hint: "Блоки команд", active: showScenarios, onClick: () => { closeOverlays(); setShowScenarios(true); } },
-    { id: "voice", label: "Голос", icon: "mic", hint: "Ctrl+M — говорить", active: settingsSection === "voice" && showSettings, onClick: () => openSettings("voice") },
+    { id: "voice", label: "Голос", icon: "mic", hint: "Ctrl+M — говорить", active: settingsTab === "voice" && showSettings, onClick: () => openSettings("voice") },
     { id: "memories", label: "Память", icon: "memories", hint: "Что VERA знает о вас", active: showMemory, onClick: () => { closeOverlays(); setShowMemory(true); } },
-    { id: "settings", label: "Настройки", icon: "settings", hint: "Ctrl+,", active: settingsSection === "all" && showSettings, onClick: () => openSettings("all") },
+    { id: "settings", label: "Настройки", icon: "settings", hint: "Ctrl+,", active: settingsTab !== "voice" && showSettings, onClick: () => openSettings(settingsTab === "voice" ? "model" : undefined) },
   ];
 
   const composer = (
@@ -709,7 +747,7 @@ export default function App() {
           </AnimatePresence>
 
           <div className="chips-bar">
-            <button className="pill pill--active" title="Модель (изменить в настройках)" onClick={() => openSettings("all")}>
+            <button className="pill pill--active" title="Модель (изменить в настройках)" onClick={() => openSettings("model")}>
               <Sparkle size={16} /> {settings.model.split("/").pop()}
             </button>
             <button
@@ -753,12 +791,15 @@ export default function App() {
             {showSettings && (
               <SettingsPanel
                 key="settings"
-                section={settingsSection}
+                tab={settingsTab}
+                onTab={setSettingsTab}
                 settings={settings}
                 keyError={keyError}
                 models={models}
                 onChange={setSettings}
                 onClose={() => setShowSettings(false)}
+                checkKey={() => provider.checkKey()}
+                data={dataActions}
               />
             )}
 

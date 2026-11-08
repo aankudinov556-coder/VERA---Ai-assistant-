@@ -27,7 +27,23 @@ export interface Memory {
  * Хранилище истории и памяти. ID — UUID-строки, чтобы позже записи
  * с разных устройств можно было сливать при синхронизации без конфликтов.
  */
+/** Резервная копия всех данных (формат пригодится и для синхронизации). */
+export interface Backup {
+  app: "vera";
+  version: 1;
+  exported_at: number;
+  conversations: Conversation[];
+  messages: StoredMessage[];
+  memories: Memory[];
+  scenarios: Scenario[];
+}
+
 export interface Store {
+  exportAll(): Promise<Backup>;
+  /** Слияние: записи с теми же id перезаписываются, остальные добавляются. */
+  importAll(b: Backup): Promise<void>;
+  clearHistory(): Promise<void>;
+  clearMemories(): Promise<void>;
   listConversations(query?: string): Promise<Conversation[]>;
   createConversation(title: string): Promise<Conversation>;
   renameConversation(id: string, title: string): Promise<void>;
@@ -51,7 +67,44 @@ async function createSqlStore(): Promise<Store> {
   const { default: Database } = await import("@tauri-apps/plugin-sql");
   const db = await Database.load("sqlite:vera.db");
 
-  return {
+  const sqlStore: Store = {
+    async exportAll() {
+      return {
+        app: "vera",
+        version: 1,
+        exported_at: now(),
+        conversations: await db.select<Conversation[]>("SELECT * FROM conversations"),
+        messages: await db.select<StoredMessage[]>("SELECT * FROM messages"),
+        memories: await db.select<Memory[]>("SELECT * FROM memories"),
+        scenarios: await sqlStore.listScenarios(),
+      };
+    },
+    async importAll(b) {
+      for (const c of b.conversations ?? [])
+        await db.execute(
+          "INSERT OR REPLACE INTO conversations (id, title, created_at, updated_at) VALUES ($1, $2, $3, $4)",
+          [c.id, c.title, c.created_at, c.updated_at],
+        );
+      for (const m of b.messages ?? [])
+        await db.execute(
+          "INSERT OR REPLACE INTO messages (id, conversation_id, role, content, created_at) VALUES ($1, $2, $3, $4, $5)",
+          [m.id, m.conversation_id, m.role, m.content, m.created_at],
+        );
+      for (const m of b.memories ?? [])
+        await db.execute("INSERT OR REPLACE INTO memories (id, content, created_at) VALUES ($1, $2, $3)", [
+          m.id,
+          m.content,
+          m.created_at,
+        ]);
+      for (const sc of b.scenarios ?? []) await sqlStore.saveScenario(sc);
+    },
+    async clearHistory() {
+      await db.execute("DELETE FROM messages");
+      await db.execute("DELETE FROM conversations");
+    },
+    async clearMemories() {
+      await db.execute("DELETE FROM memories");
+    },
     async listConversations(query) {
       const q = query?.trim();
       if (!q) {
@@ -134,6 +187,7 @@ async function createSqlStore(): Promise<Store> {
       await db.execute("DELETE FROM scenarios WHERE id = $1", [id]);
     },
   };
+  return sqlStore;
 }
 
 // ---------- localStorage (браузер, режим разработки) ----------
@@ -165,7 +219,36 @@ function createLocalStore(): Store {
   };
   const byUpdated = (a: Conversation, b: Conversation) => b.updated_at - a.updated_at;
 
+  const upsert = <T extends { id: string }>(list: T[], items: T[]) => {
+    const map = new Map(list.map((x) => [x.id, x]));
+    items.forEach((x) => map.set(x.id, x));
+    return [...map.values()];
+  };
+
   return {
+    async exportAll() {
+      const d = read();
+      return { app: "vera", version: 1, exported_at: now(), ...d, scenarios: d.scenarios ?? [] };
+    },
+    async importAll(b) {
+      const d = read();
+      d.conversations = upsert(d.conversations, b.conversations ?? []);
+      d.messages = upsert(d.messages, b.messages ?? []);
+      d.memories = upsert(d.memories, b.memories ?? []);
+      d.scenarios = upsert(d.scenarios ?? [], b.scenarios ?? []);
+      write(d);
+    },
+    async clearHistory() {
+      const d = read();
+      d.conversations = [];
+      d.messages = [];
+      write(d);
+    },
+    async clearMemories() {
+      const d = read();
+      d.memories = [];
+      write(d);
+    },
     async listConversations(query) {
       const d = read();
       const q = query?.trim().toLowerCase();

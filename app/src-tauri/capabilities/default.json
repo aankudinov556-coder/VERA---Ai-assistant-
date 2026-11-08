@@ -9,6 +9,7 @@
     "core:default",
     "sql:default",
     "sql:allow-execute",
+    "dialog:default",
     {
       "identifier": "http:default",
       "allow": [

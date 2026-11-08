@@ -18,7 +18,7 @@ export interface Settings {
 const KEY = "vera.settings.v1";
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-const DEFAULTS: Settings = {
+export const DEFAULTS: Settings = {
   apiKey: "",
   model: "anthropic/claude-sonnet-4.5",
   systemPrompt:
