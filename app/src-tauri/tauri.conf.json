@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run fetch-model && npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -20,12 +20,14 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://openrouter.ai ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' blob: data: https://openrouter.ai ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

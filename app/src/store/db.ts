@@ -1,5 +1,6 @@
 import { isTauri } from "./settings";
 import type { Role } from "../providers/types";
+import type { Scenario } from "../scenarios/types";
 
 export interface Conversation {
   id: string;
@@ -36,6 +37,9 @@ export interface Store {
   listMemories(): Promise<Memory[]>;
   addMemory(content: string): Promise<Memory | null>;
   deleteMemory(id: string): Promise<void>;
+  listScenarios(): Promise<Scenario[]>;
+  saveScenario(s: Scenario): Promise<void>;
+  deleteScenario(id: string): Promise<void>;
 }
 
 const now = () => Date.now();
@@ -115,6 +119,20 @@ async function createSqlStore(): Promise<Store> {
     async deleteMemory(id) {
       await db.execute("DELETE FROM memories WHERE id = $1", [id]);
     },
+    async listScenarios() {
+      const rows = await db.select<{ data: string }[]>("SELECT data FROM scenarios ORDER BY name COLLATE NOCASE");
+      return rows.map((r) => JSON.parse(r.data) as Scenario);
+    },
+    async saveScenario(sc) {
+      await db.execute(
+        `INSERT INTO scenarios (id, name, enabled, data, updated_at) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT(id) DO UPDATE SET name = $2, enabled = $3, data = $4, updated_at = $5`,
+        [sc.id, sc.name, sc.enabled ? 1 : 0, JSON.stringify(sc), sc.updated_at],
+      );
+    },
+    async deleteScenario(id) {
+      await db.execute("DELETE FROM scenarios WHERE id = $1", [id]);
+    },
   };
 }
 
@@ -124,6 +142,7 @@ interface LocalData {
   conversations: Conversation[];
   messages: StoredMessage[];
   memories: Memory[];
+  scenarios?: Scenario[];
 }
 
 function createLocalStore(): Store {
@@ -207,6 +226,19 @@ function createLocalStore(): Store {
     async deleteMemory(id) {
       const d = read();
       d.memories = d.memories.filter((m) => m.id !== id);
+      write(d);
+    },
+    async listScenarios() {
+      return [...(read().scenarios ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+    },
+    async saveScenario(sc) {
+      const d = read();
+      d.scenarios = [...(d.scenarios ?? []).filter((x) => x.id !== sc.id), sc];
+      write(d);
+    },
+    async deleteScenario(id) {
+      const d = read();
+      d.scenarios = (d.scenarios ?? []).filter((x) => x.id !== id);
       write(d);
     },
   };

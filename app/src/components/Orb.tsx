@@ -1,4 +1,4 @@
-export type OrbState = "idle" | "thinking" | "speaking";
+export type OrbState = "idle" | "thinking" | "speaking" | "listening";
 
 export function Orb({ state }: { state: OrbState }) {
   return (

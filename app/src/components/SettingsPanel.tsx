@@ -51,6 +51,38 @@ export function SettingsPanel({ settings, keyError, models, onChange, onClose }:
           />
         </label>
 
+        <h3>Голос</h3>
+        <label className="row">
+          <input
+            type="checkbox"
+            checked={settings.wakeEnabled}
+            onChange={(e) => set("wakeEnabled", e.target.checked)}
+          />
+          Слушать слово активации (микрофон включён постоянно)
+        </label>
+        <label>
+          Слово активации
+          <input value={settings.wakeWord} onChange={(e) => set("wakeWord", e.target.value)} />
+          <span className="muted small">Одно простое русское слово, например «вера».</span>
+        </label>
+        <label>
+          Распознавание речи
+          <select
+            value={settings.sttEngine}
+            onChange={(e) => set("sttEngine", e.target.value as Settings["sttEngine"])}
+          >
+            <option value="local">Локально (Vosk) — офлайн, бесплатно, хорошо для команд</option>
+            <option value="cloud">Облако (OpenRouter) — точнее для свободной речи</option>
+          </select>
+        </label>
+        {settings.sttEngine === "cloud" && (
+          <label>
+            Модель для распознавания (с поддержкой аудио)
+            <input value={settings.sttModel} onChange={(e) => set("sttModel", e.target.value)} />
+          </label>
+        )}
+
+        <h3>Интерфейс</h3>
         <label>
           Эффекты (для слабых ПК выберите «Упрощённые»)
           <select value={settings.fx} onChange={(e) => set("fx", e.target.value as FxMode)}>

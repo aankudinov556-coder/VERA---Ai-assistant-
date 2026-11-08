@@ -9,6 +9,10 @@ export interface Settings {
   systemPrompt: string;
   fx: FxMode;
   memoryEnabled: boolean;
+  wakeEnabled: boolean;
+  wakeWord: string;
+  sttEngine: "local" | "cloud";
+  sttModel: string;
 }
 
 const KEY = "vera.settings.v1";
@@ -21,6 +25,10 @@ const DEFAULTS: Settings = {
     "Ты — VERA, дружелюбный и внимательный ИИ-компаньон. Отвечай по-русски, коротко и по делу, если не попросили иначе.",
   fx: "lite",
   memoryEnabled: true,
+  wakeEnabled: false,
+  wakeWord: "вера",
+  sttEngine: "local",
+  sttModel: "google/gemini-2.5-flash",
 };
 
 function load(): Settings {
